@@ -226,9 +226,7 @@ const preview = document.getElementById("preview");
 console.log("JavaScript Loaded Successfully");
 
 imageInput.addEventListener("change", function () {
-
     const file = this.files[0];
-
     if (file) {
         preview.src = URL.createObjectURL(file);
         preview.style.display = "block";
@@ -249,46 +247,63 @@ async function predict() {
     const formData = new FormData();
     formData.append("image", file);
 
-    document.getElementById("loader").style.display = "block";
-    document.getElementById("result").innerHTML = "";
+    const loader = document.getElementById("loader");
+    const result = document.getElementById("result");
+
+    loader.style.display = "block";
+    result.innerHTML = "";
+
+    // =========================
+    // ADD TIMEOUT (IMPORTANT FIX)
+    // =========================
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+        controller.abort();
+    }, 30000); // 30 seconds max
 
     try {
 
         const response = await fetch("/predict", {
             method: "POST",
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+
+        clearTimeout(timeout);
 
         const data = await response.json();
 
-        document.getElementById("loader").style.display = "none";
+        loader.style.display = "none";
 
         if (!response.ok) {
-
-            document.getElementById("result").innerHTML =
-                " " + (data.error || "Server Error");
-
+            result.innerHTML = "Error: " + (data.error || "Server Error");
             console.error(data);
             return;
         }
 
-        if (data.prediction === "Tumor") {
-
-            document.getElementById("result").innerHTML =
-                "Tumor Detected";
-
-        } else {
-
-            document.getElementById("result").innerHTML =
-                "No Tumor Detected";
+        // =========================
+        // SAFE RESPONSE CHECK
+        // =========================
+        if (!data.prediction) {
+            result.innerHTML = "Invalid response from server";
+            return;
         }
+
+        result.innerHTML =
+            data.prediction === "Tumor"
+                ? "Tumor Detected"
+                : "No Tumor Detected";
 
     } catch (error) {
 
-        document.getElementById("loader").style.display = "none";
+        clearTimeout(timeout);
+        loader.style.display = "none";
 
-        document.getElementById("result").innerHTML =
-            "Server Error";
+        if (error.name === "AbortError") {
+            result.innerHTML = "Request timed out. Try again.";
+        } else {
+            result.innerHTML = "Server Error";
+        }
 
         console.error("Fetch Error:", error);
     }

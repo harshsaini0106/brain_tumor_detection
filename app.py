@@ -8,10 +8,9 @@ import os
 app = Flask(__name__)
 
 # =========================
-# FORCE STABLE TF BEHAVIOR
+# SAFE TF CONFIG
 # =========================
 tf.keras.backend.clear_session()
-tf.config.run_functions_eagerly(False)  # IMPORTANT: remove eager mode
 tf.get_logger().setLevel('ERROR')
 
 print("Loading model...")
@@ -19,7 +18,7 @@ model = load_model("brain_tumor_cnn.keras")
 print("Model loaded successfully")
 
 # =========================
-# WARMUP MODEL (VERY IMPORTANT)
+# MODEL WARMUP (CRITICAL FIX)
 # =========================
 dummy = np.zeros((1, 128, 128, 1), dtype=np.float32)
 model.predict(dummy, verbose=0)
@@ -36,43 +35,53 @@ def predict():
     print("Prediction request received")
 
     try:
-        # -------------------------
-        # CHECK FILE
-        # -------------------------
+        # =========================
+        # CHECK INPUT FILE
+        # =========================
         if "image" not in request.files:
             return jsonify({"error": "No image uploaded"}), 400
 
         file = request.files["image"]
 
-        # -------------------------
-        # READ IMAGE SAFELY
-        # -------------------------
+        # =========================
+        # SAFE IMAGE DECODING FIX
+        # =========================
         file_bytes = np.frombuffer(file.read(), np.uint8)
 
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)  # FIX (not grayscale)
 
         if img is None:
             return jsonify({"error": "Invalid image file"}), 400
 
-        # -------------------------
+        # =========================
+        # CONVERT TO GRAYSCALE SAFELY
+        # =========================
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # =========================
         # PREPROCESS
-        # -------------------------
+        # =========================
         img = cv2.resize(img, (128, 128))
         img = img.astype("float32") / 255.0
-        img = np.expand_dims(img, axis=(0, -1))  # (1,128,128,1)
+
+        img = np.expand_dims(img, axis=-1)   # (128,128,1)
+        img = np.expand_dims(img, axis=0)    # (1,128,128,1)
 
         print("Before prediction")
 
-        # -------------------------
-        # PREDICT (SAFE)
-        # -------------------------
-        prob = float(model.predict(img, verbose=0)[0][0])
+        # =========================
+        # PREDICTION (SAFE)
+        # =========================
+        prob = model.predict(img, verbose=0)
+
+        # FIX: avoid freezing float conversion issues
+        prob = float(prob.squeeze())
 
         print("After prediction")
 
-        # -------------------------
+        # =========================
         # RESULT
-        # -------------------------
+        # =========================
         prediction = "Tumor" if prob > 0.5 else "No Tumor"
 
         print(f"Prediction: {prediction}, Probability: {prob}")
@@ -93,6 +102,6 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=port,
-        debug=False,   # IMPORTANT: prevents reloader double-loading model
-        threaded=True  # IMPORTANT: prevents request blocking
+        debug=False,
+        threaded=True
     )
