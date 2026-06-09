@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import cv2
+from PIL import Image
 from tensorflow.keras.models import load_model
 
 st.set_page_config(
@@ -22,26 +22,21 @@ uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if uploaded_file:
 
     # Read image
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+    image = Image.open(uploaded_file).convert("L")  # grayscale
+    image = image.resize((128, 128))  # PIL resize (NO cv2)
 
-    if img is None:
-        st.error("Invalid image file")
+    img = np.array(image)
 
-    else:
-        # Resize only for model
-        img_resized = cv2.resize(img, (128, 128))
-        img_norm = img_resized.astype("float32") / 255.0
-        img_input = np.expand_dims(img_norm, axis=(0, -1))
+    img_norm = img.astype("float32") / 255.0
+    img_input = np.expand_dims(img_norm, axis=(0, -1))
 
-        # Show ONLY uploaded image
-        st.subheader("Uploaded MRI")
-        st.image(img, width=250, clamp=True)
+    # Show ONLY uploaded image
+    st.subheader("Uploaded MRI")
+    st.image(img, width=250, clamp=True)
 
-        # Predict button
-        if st.button("Predict Tumor"):
-
-            try:
+    # Predict button
+    if st.button("Predict Tumor"):
+        try:
                 with st.spinner("Analyzing MRI scan..."):
 
                     prob = float(model.predict(img_input, verbose=0).squeeze())
@@ -58,5 +53,5 @@ if uploaded_file:
                 st.progress(prob if prediction == "Tumor" else 1 - prob)
                 #st.write(f"Probability: **{prob:.2f}**")
 
-            except Exception as e:
-                st.error(f"Prediction Error: {str(e)}")
+        except Exception as e:
+            st.error(f"Prediction Error: {str(e)}")
