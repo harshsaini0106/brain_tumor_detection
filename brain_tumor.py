@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import *
 
-image_directory = r'C:\Users\saini\OneDrive\ONLY FOR ME\ai\deeplearning\braintumor\brain_tumor_dataset\\'
+image_directory = "brain_tumor_dataset/"
 
 
 no_tumor_images= os.listdir(image_directory + 'no/')
@@ -117,4 +117,4 @@ from sklearn.metrics import roc_auc_score
 y_prob = model.predict(x_test)
 print("AUC:", roc_auc_score(y_test, y_prob))
 
-model.save("brain_tumor_cnn.keras")
+model.save("brain_tumor_cnn.h5")

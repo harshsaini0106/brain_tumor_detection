@@ -10,7 +10,7 @@ st.set_page_config(
 
 @st.cache_resource
 def load_my_model():
-    return load_model("brain_tumor_cnn.keras")
+    return load_model("brain_tumor_cnn.h5")
 
 model = load_my_model()
 
